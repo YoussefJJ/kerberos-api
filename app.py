@@ -1,7 +1,5 @@
 import json
-import sqlite3
 import json
-import sqlite3
 from flask import Flask, Response, request
 from flask_kerberos import init_kerberos
 from flask_kerberos import requires_authentication
