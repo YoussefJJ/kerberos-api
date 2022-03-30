@@ -1,23 +1,30 @@
 import json
 import sqlite3
+import json
+import sqlite3
 from flask import Flask, Response, request
-from User import User
+from flask_kerberos import init_kerberos
+from flask_kerberos import requires_authentication
+from services.user_service import *
+
 app = Flask(__name__)
 
 @app.route('/signup', methods=['POST', 'GET'])
-def signup():
+@requires_authentication
+def signup(user):
 
-    user = dict(request.get_json())
-    user = add_user(user)
+    signup_user = dict(request.get_json())
+    signup_user = add_user(signup_user)
     return Response(status=201)
 
 
 @app.route('/login', methods=['POST', 'GET'])
-def login():
-    user = dict(request.get_json())
-    response, user = find_user(user)
+@requires_authentication
+def login(user):
+    login_user = dict(request.get_json())
+    response, login_user = find_user(login_user)
     response = app.response_class(
-        response=json.dumps(user),
+        response=json.dumps(login_user),
         status=200,
         mimetype='application/json'
     )
@@ -25,7 +32,8 @@ def login():
 
 
 @app.route('/check_email', methods=['POST', 'GET'])
-def check_email():
+@requires_authentication
+def check_email(user):
     data = dict(request.get_json())
     print(data)
     email = data["email"]
@@ -33,51 +41,7 @@ def check_email():
     return response
 
 
-def add_user(user_to_insert):
-    connection = sqlite3.connect("test_db.db")
-    cursor = connection.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='USER';")
-    if (not cursor.fetchall()):
-        cursor.execute("CREATE TABLE USER(first_name VARCHAR2, last_name VARCHAR2, email VARCHAR2, pwd VARCHAR2)")
-    sql_query = 'INSERT INTO user VALUES(?,?,?,?);'
-    user = User()
-    print(user_to_insert)
-    user.setEmail(user_to_insert["email"])
-    user.setFirstName(user_to_insert["firstname"])
-    user.setLastName(user_to_insert["lastname"])
-    user.setHashedPasswd(user_to_insert["hashedpwd"])
-    cursor.execute(sql_query, (user.firstname, user.lastname, user.email, user.hashedpwd))
-    connection.commit()
-    connection.close()
-    return user
-
-def find_user(credentials):
-    sql_query = 'SELECT * FROM user WHERE email=? and pwd=?;'
-    connection = sqlite3.connect("test_db.db")
-    cursor = connection.cursor()
-    user_to_find = (
-        credentials['email'],
-        credentials['hashedpwd']
-    )
-    cursor.execute(sql_query, user_to_find)
-    if (cursor.fetchall() == []):
-        print("Invalid credentials.")
-        return Response(status=401), None
-    cursor.execute(sql_query, user_to_find)
-    user = {}    
-    user_found = cursor.fetchone()
-    user["firstname"] = user_found[0]
-    user["lastname"] = user_found[1]
-    return Response(status=200), user
-
-def check(email):
-    connection = sqlite3.connect("test_db.db")
-    cursor = connection.cursor()
-    cursor.execute('SELECT * FROM user WHERE email=?',(email,))
-    response = Response(409 if cursor.fetchall() != [] else 200)
-    connection.close()
-    return response
-
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    init_kerberos(app,service='host', hostname="service1.insat.tn")
+    app.run(host='0.0.0.0', port=9998, debug=True)
